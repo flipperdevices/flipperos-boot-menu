@@ -1,8 +1,8 @@
-# FlipperOS boot menu — initramfs-only ARM64 image (cpio + cpio.zst)
+# FlipperOS boot menu: initramfs-only ARM64 image (cpio + cpio.zst)
 #
 # This is the first thing the device runs: it lists the profiles it can find, on
 # the internal storage and on anything plugged in, and kexecs into the one
-# chosen. It supplies no kernel of its own — every boot uses the kernel, initrd
+# chosen. It supplies no kernel of its own: every boot uses the kernel, initrd
 # and device tree named by the chosen profile's own BLS entry.
 
 # Architecture: ARM64. RK3576 is a Cortex-A72/A53 big.LITTLE SoC; A53-tuned
@@ -10,7 +10,7 @@
 BR2_aarch64=y
 BR2_cortex_a53=y
 
-# Toolchain: Buildroot-internal, glibc, threads (Rust). No C++ — flipctl renders
+# Toolchain: Buildroot-internal, glibc, threads (Rust). No C++, flipctl renders
 # with Slint's software renderer, so nothing links libstdc++.
 BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
 

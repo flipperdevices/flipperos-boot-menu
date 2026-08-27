@@ -1,13 +1,21 @@
 #!/bin/sh
 # Launched by BusyBox init (respawn) on the console.
 #
-# The menu draws on the panel, not on a terminal, so unlike the installer it needs
-# no controlling terminal: its stdio is only where its log goes. That log is worth
-# having on the serial console, since a device that will not boot is diagnosed
-# there, so resolve the real console device (/dev/console cannot be a ctty and
-# tells us nothing about which port is active) and point stdio at it.
-con=$(sed 's/.* //' /sys/class/tty/console/active 2>/dev/null)
-con="/dev/${con:-console}"
+# The menu draws on the panel, not on a terminal, so unlike the installer it needs no
+# controlling terminal: its stdio is only where its log goes. So point it at
+# /dev/console, which the kernel fans out to every console it registered -- both UARTs
+# and the panel's tty here. Resolving one device and writing to that instead is how the
+# first boot of this image produced nothing on the debug probe: the cmdline lists
+# tty1, ttyS0 and ttyS4, and picking the last word landed on the one the probe does
+# not read.
+con=/dev/console
+
+# BusyBox init gives its children /sbin:/usr/sbin:/bin:/usr/bin, and the profile tools
+# install to /usr/local/sbin, so anything resolving a bare name through PATH would not
+# find them. The menu now looks them up itself, but the shell paths in this image --
+# bootmenu=shell, the serial getty, the tools calling each other -- go through PATH.
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/usr/sbin:/bin:/usr/bin
+export PATH
 
 # Options from the kernel command line:
 #   bootmenu=dryrun   load a profile's kernel and unload it again instead of
@@ -21,6 +29,22 @@ done
 
 diag() { echo "boot-menu-launch: $*" >/dev/kmsg 2>/dev/null || true; }
 diag "console=$con mode=$mode"
+
+# Take the kernel's text console off the framebuffer, which here is the panel.
+#
+# fbcon binds to fb0 unless the cmdline says otherwise, and this image does not choose
+# its own cmdline: it runs under whatever the loader passes, so an entry without
+# fbcon=map:1 has every kernel message painting over the menu. Unbinding is the half we
+# control, and it costs nothing the panel wants: messages still reach the UARTs, so the
+# serial log stays whole.
+for vtcon in /sys/class/vtconsole/vtcon*; do
+	[ -r "$vtcon/name" ] || continue
+	case "$(cat "$vtcon/name")" in
+		*"frame buffer"*)
+			echo 0 > "$vtcon/bind" 2>/dev/null \
+				&& diag "unbound ${vtcon##*/} from the framebuffer" ;;
+	esac
+done
 
 case "$mode" in
 	shell)  exec /bin/sh <"$con" >"$con" 2>&1 ;;

@@ -1,0 +1,29 @@
+#!/bin/sh
+# A shell on the serial console, alongside the menu.
+#
+# The menu owns the panel, not the console, so a getty here costs nothing and is the
+# only way into this image from a desk: it carries no network, deliberately. Its
+# output interleaves with the menu's log on the same port, which is what a debug
+# image should do rather than hide one of the two.
+#
+# The port and its speed come from the kernel command line rather than being written
+# down twice: `console=ttyS0,1500000n8` is where the board's debug UART is, and it
+# moves between boards.
+set -eu
+
+for a in $(cat /proc/cmdline 2>/dev/null); do
+	case "$a" in
+		console=ttyS*|console=ttyAMA*|console=ttyFIQ*)
+			port=${a#console=}
+			dev=${port%%,*}
+			speed=${port#*,}
+			speed=${speed%%[!0-9]*}
+			[ -c "/dev/$dev" ] || continue
+			exec getty -L "$dev" "${speed:-115200}" vt100
+			;;
+	esac
+done
+
+# No serial console on this board, or none that exists as a device. Sleep rather than
+# exit: init would respawn us in a tight loop, and a busy CPU is worse than no shell.
+exec sleep infinity

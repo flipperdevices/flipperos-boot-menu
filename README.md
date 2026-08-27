@@ -7,8 +7,8 @@ chosen.
 
 The build produces a standalone initramfs archive in two forms:
 
-- `output/images/rootfs.cpio` — uncompressed
-- `output/images/rootfs.cpio.zst` — zstd-compressed (kernel must support
+- `output/images/rootfs.cpio`: uncompressed
+- `output/images/rootfs.cpio.zst`: zstd-compressed (kernel must support
   `CONFIG_RD_ZSTD`)
 
 There is **no kernel and no bootloader** here, and that is the point twice over:
@@ -66,6 +66,8 @@ git submodule update --init --recursive
 make                       # defconfig on first use, then build
 make menuconfig            # tweak    | make savedefconfig   save it back
 make FLIPPER_BOOT_MENU_VERSION=<sha>   # pin the menu to an exact commit
+                                       # (the default is the dev tip, resolved to a
+                                       #  sha so a rebuild actually refetches)
 ```
 
 ## Kernel command line
