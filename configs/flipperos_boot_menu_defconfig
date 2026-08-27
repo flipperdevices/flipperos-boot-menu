@@ -1,0 +1,60 @@
+# FlipperOS boot menu — initramfs-only ARM64 image (cpio + cpio.zst)
+#
+# This is the first thing the device runs: it lists the profiles it can find, on
+# the internal storage and on anything plugged in, and kexecs into the one
+# chosen. It supplies no kernel of its own — every boot uses the kernel, initrd
+# and device tree named by the chosen profile's own BLS entry.
+
+# Architecture: ARM64. RK3576 is a Cortex-A72/A53 big.LITTLE SoC; A53-tuned
+# code runs correctly on both clusters.
+BR2_aarch64=y
+BR2_cortex_a53=y
+
+# Toolchain: Buildroot-internal, glibc, threads (Rust). No C++ — flipctl renders
+# with Slint's software renderer, so nothing links libstdc++.
+BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
+
+# Build all target C packages optimized for size (-Os).
+BR2_OPTIMIZE_S=y
+
+# BusyBox init: it gives spawned processes a controlling terminal, respawns the
+# menu, and runs the standard rcS/udev startup. For an initramfs Buildroot
+# installs a pre-init /init that mounts devtmpfs and then execs /sbin/init.
+BR2_INIT_BUSYBOX=y
+BR2_PACKAGE_BUSYBOX=y
+
+# No automatic getty; our /etc/inittab runs the boot menu on the console instead.
+# BR2_TARGET_GENERIC_GETTY is not set
+
+# /dev managed dynamically by eudev, so the panel and the buttons appear.
+BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_EUDEV=y
+# Drop the udev hardware database (~16 MB: hwdb.bin + PCI/USB/OUI sources). The
+# menu opens the panel's DRM card by driver name and reads the buttons from
+# evdev directly, so no vendor/model tables are consulted.
+# BR2_PACKAGE_EUDEV_ENABLE_HWDB is not set
+
+# The menu itself, and the profile tools it shells out to.
+BR2_PACKAGE_FLIPPER_BOOT_MENU=y
+BR2_PACKAGE_FLIPPER_BTRFS_TOOLS=y
+
+# What those tools need at runtime, beyond what the packages above select:
+#
+# The shell tools are written for GNU coreutils and a full awk. Recovery ships
+# both for the same scripts, and BusyBox's applets are a third dialect on top of
+# the mawk/gawk difference these scripts have already tripped over once, so the
+# real ones come along rather than the applets.
+BR2_PACKAGE_COREUTILS=y
+BR2_PACKAGE_MAWK=y
+
+# Custom /etc/inittab and the launcher (board/flipperos/rootfs-overlay).
+BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_FLIPPEROS_BOOTMENU_PATH)/board/flipperos/rootfs-overlay"
+
+# Trim files no package flag can remove (unused glibc libmvec, btrfs-progs'
+# debug tools).
+BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_FLIPPEROS_BOOTMENU_PATH)/board/flipperos/post-build.sh"
+
+# Filesystem image: initramfs cpio only (no kernel, no bootloader, no tarball).
+# zstd compression writes rootfs.cpio.zst and keeps the uncompressed cpio.
+BR2_TARGET_ROOTFS_CPIO=y
+BR2_TARGET_ROOTFS_CPIO_ZSTD=y
+# BR2_TARGET_ROOTFS_TAR is not set

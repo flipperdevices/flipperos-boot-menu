@@ -1,0 +1,32 @@
+#!/bin/sh
+# Launched by BusyBox init (respawn) on the console.
+#
+# The menu draws on the panel, not on a terminal, so unlike the installer it needs
+# no controlling terminal: its stdio is only where its log goes. That log is worth
+# having on the serial console, since a device that will not boot is diagnosed
+# there, so resolve the real console device (/dev/console cannot be a ctty and
+# tells us nothing about which port is active) and point stdio at it.
+con=$(sed 's/.* //' /sys/class/tty/console/active 2>/dev/null)
+con="/dev/${con:-console}"
+
+# Options from the kernel command line:
+#   bootmenu=dryrun   load a profile's kernel and unload it again instead of
+#                     handing over, which proves an entry resolves without
+#                     losing the session that asked
+#   bootmenu=shell    skip the menu, drop to a shell (debug)
+mode=menu
+for a in $(cat /proc/cmdline 2>/dev/null); do
+	case "$a" in bootmenu=*) mode="${a#bootmenu=}" ;; esac
+done
+
+diag() { echo "boot-menu-launch: $*" >/dev/kmsg 2>/dev/null || true; }
+diag "console=$con mode=$mode"
+
+case "$mode" in
+	shell)  exec /bin/sh <"$con" >"$con" 2>&1 ;;
+	dryrun) FLIPCTL_BOOT_DRY_RUN=1; export FLIPCTL_BOOT_DRY_RUN
+	        diag "dry run: profiles will be loaded and unloaded, not booted" ;;
+esac
+
+# exec so init keeps tracking this PID for respawn.
+exec flipper-boot-menu <"$con" >"$con" 2>&1

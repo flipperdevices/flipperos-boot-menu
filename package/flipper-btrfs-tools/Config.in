@@ -1,0 +1,38 @@
+config BR2_PACKAGE_FLIPPER_BTRFS_TOOLS
+	bool "flipper-btrfs-tools"
+	# Everything the boot path shells out to, selected here rather than left to
+	# the defconfig: in a boot image a package forgotten is a device that does
+	# not boot, and the failure appears as an empty menu or a refusal at the
+	# last step.
+	select BR2_PACKAGE_BTRFS_PROGS       # list-profiles, and the subvolid=5 mount
+	select BR2_PACKAGE_KEXEC             # boot-profile: there is no BusyBox applet
+	select BR2_PACKAGE_KEXEC_ZLIB        # our kernels are compressed images
+	select BR2_PACKAGE_DTC               # fdtoverlay, for a profile's own overlays
+	select BR2_PACKAGE_DTC_PROGRAMS
+	select BR2_PACKAGE_JQ                # flipmeta reads and writes the marker
+	select BR2_PACKAGE_TINYCBOR          # its cbordump, to read the marker
+	# and its json2cbor, to write one. That tool is built on cJSON, and
+	# Buildroot's tinycbor pulls cJSON in only when this is selected, so without
+	# it the package installs cbordump alone: flipmeta could read the auto-boot
+	# marker and not set it, which is Auto Start failing and nothing else.
+	select BR2_PACKAGE_CJSON
+	select BR2_PACKAGE_MAWK              # the scripts' awk, not BusyBox's
+	select BR2_PACKAGE_COREUTILS         # and their stat, date, sort, cut
+	select BR2_PACKAGE_UTIL_LINUX        # findmnt and flock
+	select BR2_PACKAGE_UTIL_LINUX_BINARIES
+	help
+	  Flipper btrfs profile/snapshot tooling: create/delete/rename
+	  profiles, snapshot send/receive/delete, maintenance, and
+	  show-space. Installed to /usr/local/sbin, with every shared helper
+	  the tools source (flipper-btrfs.sh, flipper-bls.sh,
+	  flipper-rootinfo.sh and the account-merge awk script) in
+	  /usr/lib.
+
+	  Three of them are what the boot menu is built on: list-profiles
+	  enumerates the profiles on a filesystem, flipmeta reads and writes
+	  the auto-boot marker in the metadata partition, and boot-profile
+	  reads a profile's BLS entry, assembles its device tree and kexecs
+	  into it. Their -d mode targets a filesystem other than the booted
+	  one, which is how a profile on an SD card is listed and booted.
+
+	  https://github.com/flipperdevices/flipperos-btrfs-tools

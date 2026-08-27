@@ -1,0 +1,2 @@
+source "$BR2_EXTERNAL_FLIPPEROS_BOOTMENU_PATH/package/flipper-boot-menu/Config.in"
+source "$BR2_EXTERNAL_FLIPPEROS_BOOTMENU_PATH/package/flipper-btrfs-tools/Config.in"

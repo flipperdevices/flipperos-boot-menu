@@ -1,0 +1,5 @@
+# Buildroot's out-of-tree output and its download cache. The Makefile puts both
+# here rather than inside the submodule, so `make distclean` and a fresh clone
+# behave.
+/output/
+/dl/

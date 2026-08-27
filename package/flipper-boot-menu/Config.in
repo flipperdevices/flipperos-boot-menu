@@ -1,0 +1,32 @@
+config BR2_PACKAGE_FLIPPER_BOOT_MENU
+	bool "flipper-boot-menu"
+	depends on BR2_PACKAGE_HOST_RUSTC_TARGET_ARCH_SUPPORTS # rust
+	depends on BR2_TOOLCHAIN_HAS_THREADS # rust std
+	depends on BR2_USE_MMU
+	select BR2_PACKAGE_HOST_RUSTC
+	# lsblk and findmnt, which BusyBox does not have: the menu finds every
+	# filesystem that can hold profiles by partition type, and asks which one
+	# it booted from.
+	select BR2_PACKAGE_UTIL_LINUX
+	select BR2_PACKAGE_UTIL_LINUX_BINARIES
+	# The tools it shells out to. Without them the menu draws an empty list, so
+	# they are a dependency rather than a suggestion.
+	select BR2_PACKAGE_FLIPPER_BTRFS_TOOLS
+	help
+	  The Flipper One boot menu: it lists the bootable profiles on the
+	  internal storage and on anything plugged in, and kexecs into the
+	  one chosen, using that profile's own kernel, initrd and device
+	  tree. Drawn on the 256x144 SPI panel with Slint's software
+	  renderer, straight to a DRM dumb buffer, with the panel's buttons
+	  read from evdev. No compositor, no seat, no font enumeration.
+
+	  The same screen flipctl shows, from the same widget library and the
+	  same decisions, in a binary that has nothing else in it: no idle
+	  screen, no menus, no app hosting, no browser view.
+
+	  https://github.com/flipperdevices/flipctl-slint
+
+comment "flipper-boot-menu needs a toolchain w/ threads and Rust support"
+	depends on !BR2_PACKAGE_HOST_RUSTC_TARGET_ARCH_SUPPORTS || \
+		!BR2_TOOLCHAIN_HAS_THREADS
+	depends on BR2_USE_MMU

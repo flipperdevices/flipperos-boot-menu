@@ -1,0 +1,26 @@
+# /etc/inittab — FlipperOS boot menu initramfs (BusyBox init)
+#
+# Format: <id>:<runlevels>:<action>:<process>   (runlevels are ignored)
+#
+# Buildroot's initramfs pre-init (/init) has already mounted devtmpfs on /dev
+# and exec'd busybox init. Bring up the rest, start udev so the panel and the
+# buttons appear, then run the menu.
+
+# All sysinit entries run (in order, to completion) before the respawn entry.
+::sysinit:/bin/mount -t proc  proc  /proc
+::sysinit:/bin/mount -t sysfs sysfs /sys
+::sysinit:/bin/mkdir -p /dev/pts /dev/shm /run
+::sysinit:/bin/mount -t devpts devpts /dev/pts
+# Run the S?? scripts (S10udevd starts udevd, coldplugs devices, settles).
+::sysinit:/etc/init.d/rcS
+
+# The menu, restarted if it exits: there is nothing else for this image to do,
+# and a menu that has died leaves a device with no way to boot anything.
+console::respawn:/usr/bin/boot-menu-launch
+
+# Ctrl-Alt-Del reboots.
+::ctrlaltdel:/sbin/reboot
+
+# Shutdown sequence.
+::shutdown:/etc/init.d/rcK
+::shutdown:/bin/umount -a -r
