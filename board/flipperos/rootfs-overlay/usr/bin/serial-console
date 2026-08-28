@@ -11,6 +11,11 @@
 # moves between boards.
 set -eu
 
+# The tools live in /usr/local/sbin, which init's PATH does not include, so a shell
+# opened here would need every one of them spelled out in full.
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/usr/sbin:/bin:/usr/bin
+export PATH
+
 for a in $(cat /proc/cmdline 2>/dev/null); do
 	case "$a" in
 		console=ttyS*|console=ttyAMA*|console=ttyFIQ*)
@@ -19,7 +24,10 @@ for a in $(cat /proc/cmdline 2>/dev/null); do
 			speed=${port#*,}
 			speed=${speed%%[!0-9]*}
 			[ -c "/dev/$dev" ] || continue
-			exec getty -L "$dev" "${speed:-115200}" vt100
+			# -n -l /bin/sh: no login prompt, straight to a root shell. There is
+			# nobody to authenticate as -- one account, no password -- and this
+			# console exists to be typed at while a boot is being diagnosed.
+			exec getty -L -n -l /bin/sh "$dev" "${speed:-115200}" vt100
 			;;
 	esac
 done
