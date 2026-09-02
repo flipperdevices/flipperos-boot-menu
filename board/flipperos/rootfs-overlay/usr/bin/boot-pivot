@@ -1,0 +1,63 @@
+#!/bin/sh
+# Init's first `restart` action, so this runs AS PID 1, which is the whole point: the profile's
+# systemd has to be PID 1, and the only process that can become it is the one init execs.
+#
+# boot-profile decides a profile can be pivoted into rather than kexec'd, writes /flipper-pivot
+# and sends init SIGQUIT. BusyBox then runs the shutdown actions, kills every process (the menu
+# with them, which is what lets go of the panel) and execs this. So by the time this runs there
+# is no menu, no udev, and the mounts are gone: whatever is needed here gets mounted again.
+#
+# Any failure execs /sbin/init, which starts this image over and puts the menu back. A panel
+# with nothing on it and no way back is the one outcome worth carrying a fallback for.
+set -u
+REQ=/flipper-pivot
+NEWROOT=/newroot
+
+diag() {
+    echo "boot-pivot: $*" > /dev/kmsg 2>/dev/null || true
+    echo "boot-pivot: $*" > /dev/console 2>&1 || true
+}
+back() { diag "$*, starting the menu again"; exec /sbin/init; }
+
+# The shutdown pass unmounted these, and nothing below works without them: the request names a
+# block device, which needs /dev, and mounting reads /proc.
+[ -r /proc/self/mounts ] || mount -t proc proc /proc 2>/dev/null || true
+[ -d /sys/class ]        || mount -t sysfs sysfs /sys 2>/dev/null || true
+[ -e /dev/null ]         || mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
+
+# `umount -a -r` is init's last shutdown action, and what it does to every filesystem it cannot
+# unmount is remount it read-only. Two of those matter here. This root goes read-only, so
+# nothing below can make a mount point and mount reports a missing directory rather than
+# anything about the profile. Worse, /dev goes read-only as well, and switch_root moves it
+# across as it is: the profile's systemd then comes up on a read-only devtmpfs, unable to
+# create /dev/hugepages, /dev/log or anything else it expects to, which is a boot that limps
+# rather than one that fails visibly. Ask for write back on everything being carried over.
+for _m in / /dev /run /proc /sys; do
+    mount -o remount,rw "$_m" 2>/dev/null || true
+done
+
+[ -r "$REQ" ] || back "no $REQ to act on"
+DEV=; SUBVOL=; INIT=
+. "$REQ"
+# Read once and gone: a request left lying about would pivot a later boot that never asked.
+# Best effort: the root may still be read-only, and switch_root frees this initramfs whole
+# anyway, so failing to remove it is not a reason to abandon the pivot.
+rm -f "$REQ" 2>/dev/null || true
+
+[ -n "$DEV" ] && [ -n "$SUBVOL" ] || back "the request names no device or no subvolume"
+[ -b "$DEV" ] || back "$DEV is not a block device"
+INIT=${INIT:-/sbin/init}
+
+# The image ships this directory, so a read-only root is no longer in the way; mkdir is for
+# the case where it somehow is not there, and its failure is reported by the check below.
+[ -d "$NEWROOT" ] || mkdir -p "$NEWROOT" 2>/dev/null || true
+[ -d "$NEWROOT" ] || back "no $NEWROOT to mount $SUBVOL on"
+err=$(mount -t btrfs -o "rw,subvol=$SUBVOL" "$DEV" "$NEWROOT" 2>&1) \
+    || back "cannot mount $SUBVOL on $DEV: $err"
+[ -x "$NEWROOT$INIT" ] || back "no init at $INIT inside $SUBVOL"
+
+diag "switch_root into $SUBVOL on $DEV, init $INIT"
+# Moves /dev, /proc, /sys and /run across, frees this initramfs, and execs the profile's init
+# in our place: PID 1 becomes the profile's.
+exec /sbin/switch_root "$NEWROOT" "$INIT"
+back "switch_root refused"

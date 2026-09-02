@@ -14,6 +14,11 @@
 # Run the S?? scripts (S10udevd starts udevd, coldplugs devices, settles).
 ::sysinit:/etc/init.d/rcS
 
+# What init execs, in its own place, when boot-profile asks for a pivot with SIGQUIT: the
+# shutdown actions run, every process is killed, and this replaces init itself. It is the only
+# way the profile's systemd can end up as PID 1. Nothing else sends init SIGQUIT.
+::restart:/usr/bin/boot-pivot
+
 # The menu, restarted if it exits: there is nothing else for this image to do,
 # and a menu that has died leaves a device with no way to boot anything.
 console::respawn:/usr/bin/boot-menu-launch

@@ -26,6 +26,11 @@ for s in S40network S50crond S01syslogd S02klogd S01seedrng; do
 	rm -f "$TARGET/etc/init.d/$s"
 done
 
+# Where boot-pivot mounts the profile it is handing PID 1 to. It has to exist in the image:
+# init's last shutdown action is `umount -a -r`, which remounts this root read-only, so by the
+# time boot-pivot runs as PID 1 it cannot create a mount point of its own.
+mkdir -p "$TARGET/newroot"
+
 # glibc's vectorized-math library. Buildroot copies it in as part of the C
 # library runtime, but nothing in the image links it (the menu
 # use scalar libm); libm does not depend on it. Safe to drop (~216 KB).
