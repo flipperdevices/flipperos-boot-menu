@@ -9,8 +9,8 @@
 # and /dev/console cannot become one. A session leader that opens a real tty without
 # O_NOCTTY acquires it, so resolving the UART and redirecting to it is what gives the
 # menu the terminal its TUI needs. Where there is no UART, stdio goes to /dev/console
-# as it always did -- the kernel fans that out to every console it registered, which
-# is where a panic should land -- and the menu is told not to look for a terminal.
+# as it always did, which the kernel fans out to every console it registered and is
+# where a panic should land, and the menu is told not to look for a terminal.
 #
 # The port and its speed come from the kernel command line rather than being written
 # down twice: `console=ttyS0,1500000n8` is where the board debug UART is, and it moves
@@ -36,10 +36,16 @@ done
 
 # BusyBox init gives its children /sbin:/usr/sbin:/bin:/usr/bin, and the profile tools
 # install to /usr/local/sbin, so anything resolving a bare name through PATH would not
-# find them. The menu now looks them up itself, but the shell paths in this image --
-# bootmenu=shell, the shell Ctrl-C opens, the tools calling each other -- go through PATH.
+# find them. The menu now looks them up itself, but the shell paths in this image
+# (bootmenu=shell, the shell Ctrl-C opens, the tools calling each other) go through PATH.
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/usr/sbin:/bin:/usr/bin
 export PATH
+
+# For the shell from Ctrl-C and bootmenu=shell: no getty here sets one, so it
+# would inherit none and every ncurses program in it would drop its colour. The
+# menu reads no terminfo and does not care.
+TERM=xterm-256color
+export TERM
 
 # Options from the kernel command line:
 #   bootmenu=dryrun   load a profile's kernel and unload it again instead of

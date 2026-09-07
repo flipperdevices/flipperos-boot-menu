@@ -33,6 +33,10 @@ and reads the buttons from evdev, so unlike the installer's GUI it needs no libi
 no libxkbcommon, no fontconfig and no freetype, and its glyphs are embedded at build
 time. No compositor, no seat, no browser view, no app hosting.
 
+The shell is given `TERM=xterm-256color`, since there is no getty here to set one
+and an emulator on a debug probe is what attaches. The menu itself does not care:
+crossterm writes ANSI directly and reads no terminfo.
+
 It draws the same menu on the debug UART, in characters, when the kernel command line
 puts a console on one: cursive over crossterm, which is pure Rust, so the image needs
 no ncurses and no terminfo. Arrows and Enter move and choose, `F1`..`F5` are the five
