@@ -33,6 +33,13 @@ and reads the buttons from evdev, so unlike the installer's GUI it needs no libi
 no libxkbcommon, no fontconfig and no freetype, and its glyphs are embedded at build
 time. No compositor, no seat, no browser view, no app hosting.
 
+It draws the same menu on the debug UART, in characters, when the kernel command line
+puts a console on one: cursive over crossterm, which is pure Rust, so the image needs
+no ncurses and no terminfo. Arrows and Enter move and choose, `F1`..`F5` are the five
+soft keys (and so are `z x c v b`), and Ctrl-C execs a shell in the menu's own init
+slot, so leaving the shell brings the menu back. That is why there is no getty: the
+menu holds that line itself, and two readers on one tty fight over termios.
+
 BusyBox is deliberately *not* trusted for the parts that matter: it has no
 `kexec` applet at all, no `lsblk` and no `findmnt`, and its `awk` would be a
 third dialect in scripts that have already been caught out by the mawk/gawk
@@ -55,6 +62,7 @@ This repository is a Buildroot **BR2_EXTERNAL** tree (`external.desc` name:
 ├── board/flipperos/
 │   ├── rootfs-overlay/etc/inittab
 │   ├── rootfs-overlay/usr/bin/boot-menu-launch
+│   ├── rootfs-overlay/usr/bin/boot-pivot
 │   └── post-build.sh
 └── buildroot/                     # submodule, pinned
 ```
@@ -76,6 +84,7 @@ make FLIPPER_BOOT_MENU_VERSION=<sha>   # pin the menu to an exact commit
 |---|---|
 | `bootmenu=dryrun` | load a profile's kernel and unload it again instead of handing over: proves an entry resolves without losing the session |
 | `bootmenu=shell` | skip the menu, drop to a shell |
+| `bootmenu=notui` | panel only, leaving the debug UART to somebody else |
 
 ## Licensing
 

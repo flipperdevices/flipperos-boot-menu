@@ -21,11 +21,11 @@
 
 # The menu, restarted if it exits: there is nothing else for this image to do,
 # and a menu that has died leaves a device with no way to boot anything.
+#
+# It owns the debug UART as well as the panel, so there is no getty here: two readers
+# on one line fight over termios. The shell that getty used to give is Ctrl-C in the
+# menu, which execs one in this same slot, so exiting it brings the menu back.
 console::respawn:/usr/bin/boot-menu-launch
-
-# A shell on the serial console, for diagnosing this image from a desk: it has no
-# network, so this is the only way in that is not the panel itself.
-::respawn:/usr/bin/serial-console
 
 # Ctrl-Alt-Del reboots.
 ::ctrlaltdel:/sbin/reboot
