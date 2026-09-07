@@ -1,19 +1,43 @@
 #!/bin/sh
 # Launched by BusyBox init (respawn) on the console.
 #
-# The menu draws on the panel, not on a terminal, so unlike the installer it needs no
-# controlling terminal: its stdio is only where its log goes. So point it at
-# /dev/console, which the kernel fans out to every console it registered -- both UARTs
-# and the panel's tty here. Resolving one device and writing to that instead is how the
-# first boot of this image produced nothing on the debug probe: the cmdline lists
-# tty1, ttyS0 and ttyS4, and picking the last word landed on the one the probe does
-# not read.
+# The menu draws on the panel, and also on the debug UART when there is one: the same
+# menu, in characters, so a boot can be watched and driven from a probe. That second
+# screen is what decides the stdio below.
+#
+# init makes us a session leader but gives a plain command no controlling terminal,
+# and /dev/console cannot become one. A session leader that opens a real tty without
+# O_NOCTTY acquires it, so resolving the UART and redirecting to it is what gives the
+# menu the terminal its TUI needs. Where there is no UART, stdio goes to /dev/console
+# as it always did -- the kernel fans that out to every console it registered, which
+# is where a panic should land -- and the menu is told not to look for a terminal.
+#
+# The port and its speed come from the kernel command line rather than being written
+# down twice: `console=ttyS0,1500000n8` is where the board debug UART is, and it moves
+# between boards. Picking the *first* one matters: the cmdline lists tty1, ttyS0 and
+# ttyS4, and taking the last word landed on the one the probe does not read.
+#
+# Nothing else may hold that tty. The root shell that used to run here as a getty is
+# gone for exactly that reason: two readers on one line fight over termios, and the
+# menu now offers the same shell with Ctrl-C.
 con=/dev/console
+tui=yes
+for a in $(cat /proc/cmdline 2>/dev/null); do
+	case "$a" in
+		console=ttyS*|console=ttyAMA*|console=ttyFIQ*)
+			[ "$con" = /dev/console ] || continue
+			port=${a#console=}
+			dev=${port%%,*}
+			[ -c "/dev/$dev" ] && con="/dev/$dev"
+			;;
+	esac
+done
+[ "$con" = /dev/console ] && tui=no
 
 # BusyBox init gives its children /sbin:/usr/sbin:/bin:/usr/bin, and the profile tools
 # install to /usr/local/sbin, so anything resolving a bare name through PATH would not
 # find them. The menu now looks them up itself, but the shell paths in this image --
-# bootmenu=shell, the serial getty, the tools calling each other -- go through PATH.
+# bootmenu=shell, the shell Ctrl-C opens, the tools calling each other -- go through PATH.
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/usr/sbin:/bin:/usr/bin
 export PATH
 
@@ -22,13 +46,15 @@ export PATH
 #                     handing over, which proves an entry resolves without
 #                     losing the session that asked
 #   bootmenu=shell    skip the menu, drop to a shell (debug)
+#   bootmenu=notui    panel only, leaving the UART to somebody else
 mode=menu
 for a in $(cat /proc/cmdline 2>/dev/null); do
 	case "$a" in bootmenu=*) mode="${a#bootmenu=}" ;; esac
 done
+[ "$mode" = notui ] && tui=no
 
 diag() { echo "boot-menu-launch: $*" >/dev/kmsg 2>/dev/null || true; }
-diag "console=$con mode=$mode"
+diag "console=$con mode=$mode tui=$tui"
 
 # Take the kernel's text console off the framebuffer, which here is the panel.
 #
@@ -52,5 +78,13 @@ case "$mode" in
 	        diag "dry run: profiles will be loaded and unloaded, not booted" ;;
 esac
 
+# Leave the terminal as the menu found it. A previous run killed mid-draw leaves raw
+# mode on and the alternate screen up, and init respawns us straight into that.
+if [ "$tui" = yes ]; then
+	stty -F "$con" sane 2>/dev/null || true
+	printf '\033[?1049l\033[?25h\033[?1000l\033[?1006l' > "$con" 2>/dev/null || true
+fi
+
 # exec so init keeps tracking this PID for respawn.
-exec flipper-boot-menu <"$con" >"$con" 2>&1
+[ "$tui" = yes ] || set -- --no-tui "$@"
+exec flipper-boot-menu "$@" <"$con" >"$con" 2>&1
